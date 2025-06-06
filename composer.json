@@ -11,15 +11,21 @@
         "doctrine/doctrine-bundle": "^2.14",
         "doctrine/doctrine-migrations-bundle": "^3.4",
         "doctrine/orm": "^3.3",
+        "fakerphp/faker": "^1.24",
         "symfony/console": "7.2.*",
         "symfony/dotenv": "7.2.*",
         "symfony/flex": "^2",
         "symfony/framework-bundle": "7.2.*",
+        "symfony/password-hasher": "7.2.*",
         "symfony/runtime": "7.2.*",
+        "symfony/security-bundle": "7.2.*",
+        "symfony/security-core": "7.2.*",
         "symfony/yaml": "7.2.*"
     },
     "require-dev": {
-        "symfony/maker-bundle": "^1.63"
+        "doctrine/doctrine-fixtures-bundle": "^4.1",
+        "symfony/maker-bundle": "^1.63",
+        "zenstruck/foundry": "^2.6"
     },
     "config": {
         "allow-plugins": {
