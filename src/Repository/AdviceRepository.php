@@ -16,20 +16,20 @@ class AdviceRepository extends ServiceEntityRepository
         parent::__construct($registry, Advice::class);
     }
 
-//    /**
-//     * @return Advice[] Returns an array of Advice objects
-//     */
-//    public function findByExampleField($value): array
-//    {
-//        return $this->createQueryBuilder('a')
-//            ->andWhere('a.exampleField = :val')
-//            ->setParameter('val', $value)
-//            ->orderBy('a.id', 'ASC')
-//            ->setMaxResults(10)
-//            ->getQuery()
-//            ->getResult()
-//        ;
-//    }
+   /**
+    * @return Advice[] Returns an array of Advice objects
+    */
+   public function findByMonth($month): array
+   {
+       return $this->createQueryBuilder('a')
+           ->join('a.month', 'm')
+           ->andWhere('m.name = :monthName')
+           ->setParameter('monthName', $month)
+           ->getQuery()
+           ->getResult();
+       ;
+   }
+
 
 //    public function findOneBySomeField($value): ?Advice
 //    {

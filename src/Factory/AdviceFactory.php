@@ -36,6 +36,7 @@ final class AdviceFactory extends PersistentProxyObjectFactory{
         return [
             'description' => 'Conseil: ' . self::faker()->sentence(),
             'user' => UserFactory::new(),
+            'month' => MonthFactory::all(),
         ];
     }
 

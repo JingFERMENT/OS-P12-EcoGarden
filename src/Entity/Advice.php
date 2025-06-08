@@ -6,6 +6,7 @@ use App\Repository\AdviceRepository;
 use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\Common\Collections\Collection;
 use Doctrine\ORM\Mapping as ORM;
+use Symfony\Component\Serializer\Annotation\Groups;
 
 #[ORM\Entity(repositoryClass: AdviceRepository::class)]
 class Advice
@@ -13,9 +14,11 @@ class Advice
     #[ORM\Id]
     #[ORM\GeneratedValue]
     #[ORM\Column]
+    #[Groups(["getAdvice"])]
     private ?int $id = null;
 
     #[ORM\Column(length: 255)]
+    #[Groups(["getAdvice"])]
     private ?string $description = null;
 
     #[ORM\ManyToOne(inversedBy: 'advice')]
