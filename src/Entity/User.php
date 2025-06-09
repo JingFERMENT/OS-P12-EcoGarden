@@ -7,6 +7,8 @@ use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\Common\Collections\Collection;
 use Doctrine\ORM\Mapping as ORM;
 use Symfony\Component\Security\Core\User\PasswordAuthenticatedUserInterface;
+use Symfony\Component\Validator\Constraints as Assert;
+use Symfony\Bridge\Doctrine\Validator\Constraints\UniqueEntity;
 
 #[ORM\Entity(repositoryClass: UserRepository::class)]
 class User implements PasswordAuthenticatedUserInterface
@@ -17,18 +19,44 @@ class User implements PasswordAuthenticatedUserInterface
     private ?int $id = null;
 
     #[ORM\Column(length: 255)]
+    #[Assert\NotBlank(message: 'Le prénom de l’utilisateur est requis.')]
     private ?string $firstName = null;
 
     #[ORM\Column(length: 255)]
     private ?string $lastName = null;
 
     #[ORM\Column(length: 255)]
+    #[Assert\NotBlank(message: 'L’adresse e-mail ne peut pas être vide.')]
+    #[Assert\Length(
+        max: 255,
+        maxMessage: 'L’adresse e-mail ne peut pas dépasser {{ limit }} caractères.'
+    )]
+    #[UniqueEntity(
+        fields: ['email'],
+        message: 'Cette adresse e-mail est déjà utilisée.'
+    )]
+    #[Assert\Regex(
+        pattern: '/^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/',
+        message: 'L’adresse e-mail doit être au format valide.'
+    )]
     private ?string $email = null;
 
     #[ORM\Column(length: 255)]
+    #[Assert\NotBlank(message: 'Le mot de passe ne peut pas être vide.')]
+    #[Assert\Length(
+        min: 8,
+        minMessage: 'Le mot de passe doit contenir au moins {{ limit }} caractères.',
+        max: 20,
+        maxMessage: 'Le mot de passe ne peut pas dépasser {{ limit }} caractères.'
+    )]
     private ?string $password = null;
 
     #[ORM\Column(length: 255)]
+    #[Assert\NotBlank(message: 'La ville ne peut pas être vide.')]
+    #[Assert\Length(
+        max: 100,
+        maxMessage: 'Le nom de la ville ne peut pas dépasser {{ limit }} caractères.'
+    )]
     private ?string $city = null;
 
     /**

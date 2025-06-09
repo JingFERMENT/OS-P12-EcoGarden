@@ -7,6 +7,7 @@ use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\Common\Collections\Collection;
 use Doctrine\ORM\Mapping as ORM;
 use Symfony\Component\Serializer\Annotation\Groups;
+use Symfony\Component\Validator\Constraints as Assert;
 
 #[ORM\Entity(repositoryClass: AdviceRepository::class)]
 class Advice
@@ -19,16 +20,24 @@ class Advice
 
     #[ORM\Column(length: 255)]
     #[Groups(["getAdvice"])]
+    #[Assert\NotBlank(message: 'La description ne peut pas être vide.')]
     private ?string $description = null;
 
     #[ORM\ManyToOne(inversedBy: 'advice')]
     #[ORM\JoinColumn(nullable: false)]
+    #[Assert\NotBlank(message: 'Utilisateur ne peut pas être vide.')]
     private ?User $user = null;
 
     /**
      * @var Collection<int, Month>
      */
     #[ORM\ManyToMany(targetEntity: Month::class, inversedBy: 'advice')]
+    #[Assert\Count(
+        min: 1,
+        minMessage: 'Vous devez sélectionner au moins un mois.',
+        max: 12,
+        maxMessage: 'Vous ne pouvez pas sélectionner plus de 12 mois.'
+    )]
     private Collection $month;
 
     public function __construct()

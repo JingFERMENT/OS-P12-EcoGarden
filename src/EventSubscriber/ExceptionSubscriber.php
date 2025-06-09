@@ -14,11 +14,6 @@ class ExceptionSubscriber implements EventSubscriberInterface
     {
         // Get the exception from the event
         $exception = $event->getThrowable();
-        
-       // Convert InvalidArgumentException to BadRequestHttpException
-        if ($exception instanceof \InvalidArgumentException) {
-            $exception = new BadRequestHttpException($exception->getMessage(), $exception);
-        } 
 
         // Check if the exception is an instance of HttpException
         if($exception instanceof HttpException) {
