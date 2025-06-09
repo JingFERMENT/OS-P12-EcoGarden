@@ -3,34 +3,65 @@
 namespace App\Entity;
 
 use App\Repository\UserRepository;
-use Doctrine\Common\Collections\ArrayCollection;
-use Doctrine\Common\Collections\Collection;
 use Doctrine\ORM\Mapping as ORM;
 use Symfony\Component\Security\Core\User\PasswordAuthenticatedUserInterface;
+use Symfony\Component\Security\Core\User\UserInterface;
+use Doctrine\Common\Collections\ArrayCollection;
+use Doctrine\Common\Collections\Collection;
 use Symfony\Component\Validator\Constraints as Assert;
 use Symfony\Bridge\Doctrine\Validator\Constraints\UniqueEntity;
 
 #[ORM\Entity(repositoryClass: UserRepository::class)]
-class User implements PasswordAuthenticatedUserInterface
+#[ORM\UniqueConstraint(name: 'UNIQ_IDENTIFIER_EMAIL', fields: ['email'])]
+class User implements UserInterface, PasswordAuthenticatedUserInterface
 {
+    /**
+     * @var int|null The user ID
+     */
     #[ORM\Id]
     #[ORM\GeneratedValue]
     #[ORM\Column]
     private ?int $id = null;
 
+    /**
+     * @var string|null The first name of the user
+     */
     #[ORM\Column(length: 255)]
-    #[Assert\NotBlank(message: 'Le prénom de l’utilisateur est requis.')]
+    #[Assert\NotBlank(message: 'Le prénom ne peut pas être vide.')]
+    #[Assert\Length(
+        min: 2,
+        max: 255,
+        minMessage: "Le prénom doit avoir au moins {{ limit }} caractères.",
+        maxMessage: "Le prénom ne peut pas dépasser {{ limit }} caractères. "
+    )]
+    #[Assert\Regex(
+        pattern: "/^[A-Z][a-zA-Z'-]+$/",
+        message: "Le prénom ne doit contenir que des lettres et commence par un majuscule."
+    )]
     private ?string $firstName = null;
 
+    /**
+     * @var string|null The last name of the user
+     */
     #[ORM\Column(length: 255)]
+    #[Assert\NotBlank(message: 'Le nom ne peut pas être vide.')]
+    #[Assert\Length(
+        min: 2,
+        max: 255,
+        minMessage: "Le nom doit avoir au moins {{ limit }} caractères.",
+        maxMessage: "Le nom ne peut pas dépasser {{ limit }} caractères. "
+    )]
+    #[Assert\Regex(
+        pattern: "/^[A-Z][a-zA-Z'-]+$/",
+        message: "Le nom ne doit contenir que des lettres et commence par un majuscule."
+    )]
     private ?string $lastName = null;
 
-    #[ORM\Column(length: 255)]
+    /**
+     * @var string|null The user email
+     */
+    #[ORM\Column(length: 180)]
     #[Assert\NotBlank(message: 'L’adresse e-mail ne peut pas être vide.')]
-    #[Assert\Length(
-        max: 255,
-        maxMessage: 'L’adresse e-mail ne peut pas dépasser {{ limit }} caractères.'
-    )]
     #[UniqueEntity(
         fields: ['email'],
         message: 'Cette adresse e-mail est déjà utilisée.'
@@ -41,7 +72,16 @@ class User implements PasswordAuthenticatedUserInterface
     )]
     private ?string $email = null;
 
-    #[ORM\Column(length: 255)]
+    /**
+     * @var list<string> The user roles
+     */
+    #[ORM\Column]
+    private array $roles = [];
+
+    /**
+     * @var string The hashed password
+     */
+    #[ORM\Column]
     #[Assert\NotBlank(message: 'Le mot de passe ne peut pas être vide.')]
     #[Assert\Length(
         min: 8,
@@ -51,11 +91,16 @@ class User implements PasswordAuthenticatedUserInterface
     )]
     private ?string $password = null;
 
+    /**
+     * @var string|null The city of the user
+     */
     #[ORM\Column(length: 255)]
     #[Assert\NotBlank(message: 'La ville ne peut pas être vide.')]
     #[Assert\Length(
-        max: 100,
-        maxMessage: 'Le nom de la ville ne peut pas dépasser {{ limit }} caractères.'
+        min: 2,
+        max: 255,
+        minMessage: "La ville doit avoir au moins {{ limit }} caractères.",
+        maxMessage: "La ville ne peut pas dépasser {{ limit }} caractères. "
     )]
     private ?string $city = null;
 
@@ -73,6 +118,86 @@ class User implements PasswordAuthenticatedUserInterface
     public function getId(): ?int
     {
         return $this->id;
+    }
+
+    public function getEmail(): ?string
+    {
+        return $this->email;
+    }
+
+    public function setEmail(string $email): static
+    {
+        $this->email = $email;
+
+        return $this;
+    }
+
+    /**
+     * A visual identifier that represents this user.
+     *
+     * @see UserInterface
+     */
+    public function getUserIdentifier(): string
+    {
+        return (string) $this->email;
+    }
+
+    /**
+     * @see UserInterface
+     */
+    public function getRoles(): array
+    {
+        $roles = $this->roles;
+        // guarantee every user at least has ROLE_USER
+        $roles[] = 'ROLE_USER';
+
+        return array_unique($roles);
+    }
+
+    /**
+     * @param list<string> $roles
+     */
+    public function setRoles(array $roles): static
+    {
+        $this->roles = $roles;
+
+        return $this;
+    }
+
+    /**
+     * @see PasswordAuthenticatedUserInterface
+     */
+    public function getPassword(): ?string
+    {
+        return $this->password;
+    }
+
+    public function setPassword(string $password): static
+    {
+        $this->password = $password;
+
+        return $this;
+    }
+
+    /**
+     * @see UserInterface
+     */
+    public function eraseCredentials(): void
+    {
+        // If you store any temporary, sensitive data on the user, clear it here
+        // $this->plainPassword = null;
+    }
+
+    public function getCity(): ?string
+    {
+        return $this->city;
+    }
+
+    public function setCity(string $city): static
+    {
+        $this->city = $city;
+
+        return $this;
     }
 
     public function getFirstName(): ?string
@@ -95,42 +220,6 @@ class User implements PasswordAuthenticatedUserInterface
     public function setLastName(string $lastName): static
     {
         $this->lastName = $lastName;
-
-        return $this;
-    }
-
-    public function getEmail(): ?string
-    {
-        return $this->email;
-    }
-
-    public function setEmail(string $email): static
-    {
-        $this->email = $email;
-
-        return $this;
-    }
-
-    public function getPassword(): ?string
-    {
-        return $this->password;
-    }
-
-    public function setPassword(string $password): static
-    {
-        $this->password = $password;
-
-        return $this;
-    }
-
-    public function getCity(): ?string
-    {
-        return $this->city;
-    }
-
-    public function setCity(string $city): static
-    {
-        $this->city = $city;
 
         return $this;
     }

@@ -5,6 +5,8 @@ namespace App\Factory;
 use App\Entity\User;
 use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
 use Zenstruck\Foundry\Persistence\PersistentProxyObjectFactory;
+use Zenstruck\Foundry\ModelFactory;
+use Zenstruck\Foundry\Proxy;
 
 /**
  * @extends PersistentProxyObjectFactory<User>
@@ -79,6 +81,7 @@ final class UserFactory extends PersistentProxyObjectFactory
             'firstName' => $firstName,
             'lastName' => $lastName,
             'password' => self::$hashedPassword,
+            'roles' => ['ROLE_USER'],
         ];
     }
 
@@ -91,4 +94,5 @@ final class UserFactory extends PersistentProxyObjectFactory
             // ->afterInstantiate(function(User $user): void {})
         ;
     }
+
 }
