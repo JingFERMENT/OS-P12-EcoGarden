@@ -6,39 +6,30 @@ use App\Entity\Advice;
 use App\Repository\AdviceRepository;
 use App\Repository\MonthRepository;
 use App\Repository\UserRepository;
+use App\Service\MonthService;
 use Doctrine\ORM\EntityManagerInterface;
+use InvalidArgumentException;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
+use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 use Symfony\Component\Routing\Attribute\Route;
 use Symfony\Component\Routing\Generator\UrlGeneratorInterface;
 use Symfony\Component\Serializer\Normalizer\AbstractNormalizer;
 use Symfony\Component\Serializer\SerializerInterface;
+use Throwable;
 
 final class AdviceController extends AbstractController
 {
-    private const MONTHS = [
-        '01' => 'janvier',
-        '02' => 'février',
-        '03' => 'mars',
-        '04' => 'avril',
-        '05' => 'mai',
-        '06' => 'juin',
-        '07' => 'juillet',
-        '08' => 'août',
-        '09' => 'septembre',
-        '10' => 'octobre',
-        '11' => 'novembre',
-        '12' => 'décembre',
-    ];
-
     #[Route('/conseil/', name: 'conseilsDuMoisEnCours', methods: ['GET'])]
-    public function getAllAdvice(AdviceRepository $adviceRepository, SerializerInterface $serializer): JsonResponse
-    {
-        $currentMonth = (new \DateTime())->format('m');
+    public function getAllAdvice(
+        AdviceRepository $adviceRepository,
+        SerializerInterface $serializer,
+        MonthService $monthService
+    ): JsonResponse {
 
-        $currentMonthName = self::MONTHS[$currentMonth];
+        $currentMonthName = $monthService->getCurrentMonthName() ?? null;
 
         $advice = $adviceRepository->findByMonth($currentMonthName);
 
@@ -55,18 +46,21 @@ final class AdviceController extends AbstractController
     }
 
     #[Route('/conseil/{mois}', name: 'conseilsParMois', methods: ['GET'])]
-    public function getAdviceByMonth(string $mois, AdviceRepository $adviceRepository, SerializerInterface $serializer): JsonResponse
+    public function getAdviceByMonth(string $mois, 
+    AdviceRepository $adviceRepository, 
+    SerializerInterface $serializer,
+    MonthService $monthService): JsonResponse
     {
-        $monthName = self::MONTHS[$mois] ?? null;
+        $monthName = $monthService->getMonthName($mois) ?? null;
 
         if ($monthName === null) {
-            return new JsonResponse(['error' => "Le mois '$mois' n'existe pas."], Response::HTTP_BAD_REQUEST);
+            throw new InvalidArgumentException("Le mois '$mois' n'est pas valide.");
         }
 
         $advice = $adviceRepository->findByMonth($monthName);
 
         if (empty($advice)) {
-            return new JsonResponse(['error' => "Aucun conseil trouvé pour le mois de $monthName."], Response::HTTP_NOT_FOUND);
+            throw new NotFoundHttpException("Aucun conseil trouvé pour le mois de $monthName.");
         }
 
         $jsonadviceList = $serializer->serialize($advice, 'json', [
@@ -81,13 +75,13 @@ final class AdviceController extends AbstractController
         );
     }
 
-    #[Route('/conseil/{id}', name: 'conseilParId', methods: ['GET'])]
+    #[Route('/conseil/view/{id}', name: 'conseilParId', methods: ['GET'])]
     public function getAdviceById(int $id, AdviceRepository $adviceRepository, SerializerInterface $serializer): JsonResponse
     {
         $advice = $adviceRepository->find($id);
 
         if (!$advice) {
-            return new JsonResponse(['error' => 'Conseil non trouvé.'], Response::HTTP_NOT_FOUND);
+            throw new NotFoundHttpException("Conseil avec l'ID $id non trouvé.");
         }
 
         $jsonadvice = $serializer->serialize($advice, 'json', [
@@ -108,7 +102,7 @@ final class AdviceController extends AbstractController
         $advice = $adviceRepository->find($id);
 
         if (!$advice) {
-            return new JsonResponse(['error' => 'Conseil non trouvé.'], Response::HTTP_NOT_FOUND);
+            throw new NotFoundHttpException("Conseil avec l'ID $id non trouvé.");
         }
 
         $entityManager->remove($advice);
@@ -132,21 +126,21 @@ final class AdviceController extends AbstractController
         $content = $request->toArray();
 
         if (!isset($content['user_id']) || empty($content['user_id'])) {
-            return new JsonResponse(['error' => 'L\'ID de l\'utilisateur est requis.'], Response::HTTP_BAD_REQUEST);
+            throw new InvalidArgumentException('L\'ID de l\'utilisateur est requis.');
         }
 
         if (!isset($content['month_ids']) || empty($content['month_ids'])) {
-            return new JsonResponse(['error' => 'Le mois du conseil est requis.'], Response::HTTP_BAD_REQUEST);
+            throw new InvalidArgumentException('Le mois du conseil est requis.');
         }
 
         if (!isset($content['description']) || empty($content['description'])) {
-            return new JsonResponse(['error' => 'La description du conseil est requis.'], Response::HTTP_BAD_REQUEST);
+            throw new InvalidArgumentException('La description du conseil est requis.');
         }
 
         $userId = $content['user_id'];
 
         if (!$userRepository->find($userId)) {
-            return new JsonResponse(['error' => 'Utilisateur non trouvé.'], Response::HTTP_NOT_FOUND);
+            throw new NotFoundHttpException('Utilisateur non trouvé.');
         }
 
         $advice->setUser($userRepository->find($userId));
@@ -155,7 +149,7 @@ final class AdviceController extends AbstractController
 
         foreach ($monthIdArrays as $monthId) {
             if (!$monthRepository->find($monthId)) {
-                return new JsonResponse(['error' => 'Mois non trouvé.'], Response::HTTP_NOT_FOUND);
+                throw new NotFoundHttpException('Mois non trouvé.');
             }
             $month = $monthRepository->find($monthId);
             $advice->addMonth($month);
@@ -187,30 +181,32 @@ final class AdviceController extends AbstractController
         UserRepository $userRepository,
         MonthRepository $monthRepository,
     ): JsonResponse {
-       
-        $updatedAdvice = $serializer->deserialize($request->getContent(), 
-            Advice::class, 
-            'json', 
-            [AbstractNormalizer::OBJECT_TO_POPULATE => $currentAdvice]);
-        
+
+        $updatedAdvice = $serializer->deserialize(
+            $request->getContent(),
+            Advice::class,
+            'json',
+            [AbstractNormalizer::OBJECT_TO_POPULATE => $currentAdvice]
+        );
+
         $content = $request->toArray();
 
         if (!isset($content['user_id']) || empty($content['user_id'])) {
-            return new JsonResponse(['error' => 'L\'ID de l\'utilisateur est requis.'], Response::HTTP_BAD_REQUEST);
+            throw new InvalidArgumentException('L\'ID de l\'utilisateur est requis.');
         }
 
         if (!isset($content['month_ids']) || empty($content['month_ids'])) {
-            return new JsonResponse(['error' => 'Le mois du conseil est requis.'], Response::HTTP_BAD_REQUEST);
+            throw new InvalidArgumentException('Le mois du conseil est requis.');
         }
 
         if (!isset($content['description']) || empty($content['description'])) {
-            return new JsonResponse(['error' => 'La description du conseil est requis.'], Response::HTTP_BAD_REQUEST);
+            throw new InvalidArgumentException('La description du conseil est requis.');
         }
 
         $userId = $content['user_id'];
 
         if (!$userRepository->find($userId)) {
-            return new JsonResponse(['error' => 'Utilisateur non trouvé.'], Response::HTTP_NOT_FOUND);
+            throw new NotFoundHttpException('Utilisateur non trouvé.');
         }
 
         $updatedAdvice->setUser($userRepository->find($userId));
@@ -219,7 +215,7 @@ final class AdviceController extends AbstractController
 
         foreach ($monthIdArrays as $monthId) {
             if (!$monthRepository->find($monthId)) {
-                return new JsonResponse(['error' => 'Mois non trouvé.'], Response::HTTP_NOT_FOUND);
+                throw new NotFoundHttpException('Mois non trouvé.');
             }
             $month = $monthRepository->find($monthId);
             $updatedAdvice->addMonth($month);
@@ -229,8 +225,8 @@ final class AdviceController extends AbstractController
         $entityManager->flush();
 
         return new JsonResponse(
-            null, // The serialized data
-            Response::HTTP_NO_CONTENT // HTTP status code 
+            null, 
+            Response::HTTP_NO_CONTENT 
         );
     }
 }
