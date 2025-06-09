@@ -102,17 +102,12 @@ final class AdviceController extends AbstractController
     }
 
     #[Route('/conseil/{id}', name: 'supprimerUnConseil', methods: ['DELETE'])]
-    public function deleteAdvice(int $id, AdviceRepository $adviceRepository, EntityManagerInterface $entityManager): JsonResponse
+    public function deleteAdvice(Advice $advice, 
+    EntityManagerInterface $entityManager): JsonResponse
     {
-        $advice = $adviceRepository->find($id);
-
-        if (!$advice) {
-            throw new NotFoundHttpException("Conseil avec l'ID $id non trouvé.");
-        }
-
         $entityManager->remove($advice);
         $entityManager->flush();
-
+        
         return new JsonResponse(['message' => 'Conseil supprimé avec succès.'], Response::HTTP_NO_CONTENT);
     }
 

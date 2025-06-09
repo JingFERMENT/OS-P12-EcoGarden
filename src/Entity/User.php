@@ -10,9 +10,11 @@ use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\Common\Collections\Collection;
 use Symfony\Component\Validator\Constraints as Assert;
 use Symfony\Bridge\Doctrine\Validator\Constraints\UniqueEntity;
+use Symfony\Component\Serializer\Annotation\Groups;
 
 #[ORM\Entity(repositoryClass: UserRepository::class)]
 #[ORM\UniqueConstraint(name: 'UNIQ_IDENTIFIER_EMAIL', fields: ['email'])]
+#[UniqueEntity(fields: ['email'], message: 'Cette adresse e-mail est déjà utilisée.')]
 class User implements UserInterface, PasswordAuthenticatedUserInterface
 {
     /**
@@ -21,6 +23,7 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     #[ORM\Id]
     #[ORM\GeneratedValue]
     #[ORM\Column]
+    #[Groups(["getUser"])]
     private ?int $id = null;
 
     /**
@@ -38,6 +41,7 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
         pattern: "/^[A-Z][a-zA-Z'-]+$/",
         message: "Le prénom ne doit contenir que des lettres et commence par un majuscule."
     )]
+    #[Groups(["getUser"])]
     private ?string $firstName = null;
 
     /**
@@ -55,6 +59,7 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
         pattern: "/^[A-Z][a-zA-Z'-]+$/",
         message: "Le nom ne doit contenir que des lettres et commence par un majuscule."
     )]
+    #[Groups(["getUser"])]
     private ?string $lastName = null;
 
     /**
@@ -62,33 +67,35 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
      */
     #[ORM\Column(length: 180)]
     #[Assert\NotBlank(message: 'L’adresse e-mail ne peut pas être vide.')]
-    #[UniqueEntity(
-        fields: ['email'],
-        message: 'Cette adresse e-mail est déjà utilisée.'
-    )]
     #[Assert\Regex(
         pattern: '/^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/',
         message: 'L’adresse e-mail doit être au format valide.'
     )]
+    #[Groups(["getUser"])]
     private ?string $email = null;
 
     /**
      * @var list<string> The user roles
      */
     #[ORM\Column]
+    #[Groups(["getUser"])]
     private array $roles = [];
 
     /**
-     * @var string The hashed password
+     * @var string|null Mot de passe en clair (non persisté, utilisé uniquement lors de la création ou mise à jour)
      */
-    #[ORM\Column]
     #[Assert\NotBlank(message: 'Le mot de passe ne peut pas être vide.')]
     #[Assert\Length(
         min: 8,
-        minMessage: 'Le mot de passe doit contenir au moins {{ limit }} caractères.',
-        max: 20,
-        maxMessage: 'Le mot de passe ne peut pas dépasser {{ limit }} caractères.'
+        minMessage: 'Le mot de passe doit contenir au moins {{ limit }} caractères.'
     )]
+    private ?string $plainPassword = null;
+
+    /**
+     * @var string|null The hashed password
+     */
+    #[ORM\Column]
+    #[Groups(["getUser"])]
     private ?string $password = null;
 
     /**
@@ -102,6 +109,7 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
         minMessage: "La ville doit avoir au moins {{ limit }} caractères.",
         maxMessage: "La ville ne peut pas dépasser {{ limit }} caractères. "
     )]
+    #[Groups(["getUser"])]
     private ?string $city = null;
 
     /**
@@ -143,6 +151,16 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     }
 
     /**
+     * Méthode getUsername qui permet de retourner le champ qui est utilisé pour l'authentification.
+     *
+     * @return string
+     */
+    public function getUsername(): string
+    {
+        return $this->getUserIdentifier();
+    }
+
+    /**
      * @see UserInterface
      */
     public function getRoles(): array
@@ -162,6 +180,16 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
         $this->roles = $roles;
 
         return $this;
+    }
+
+    public function getPlainPassword(): ?string
+    {
+        return $this->plainPassword;
+    }
+
+    public function setPlainPassword(?string $plainPassword): void
+    {
+        $this->plainPassword = $plainPassword;
     }
 
     /**
