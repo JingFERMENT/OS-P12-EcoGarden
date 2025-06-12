@@ -26,15 +26,36 @@ use Symfony\Component\Validator\Validator\ValidatorInterface;
 final class AdviceController extends AbstractController
 {
     #[Route('/conseil/', name: 'conseilsDuMoisEnCours', methods: ['GET'])]
+    /**
+     * Retrieves all advice for the current month.
+     *
+     * @param AdviceRepository $adviceRepository
+     * @param SerializerInterface $serializer
+     * @param MonthService $monthService
+     * @return JsonResponse
+     */
     public function getAllAdvice(
         AdviceRepository $adviceRepository,
         SerializerInterface $serializer,
-        MonthService $monthService
+        MonthService $monthService,
+        Request $request
     ): JsonResponse {
+
+        $requestPage = $request->get('page', 1);
+
+        if (!is_numeric($requestPage) || $requestPage < 1) {
+             throw new HttpException(JsonResponse::HTTP_BAD_REQUEST, 'Le paramètre page doit être un nombre entier positif.');
+        }
+
+        $requestLimit = $request->get('limit', 10);
+
+        if (!is_numeric($requestLimit) || $requestLimit < 1) {
+            throw new HttpException(JsonResponse::HTTP_BAD_REQUEST, 'Le paramètre limit doit être un nombre entier positif.');
+        }
 
         $currentMonthName = $monthService->getCurrentMonthName() ?? null;
 
-        $advice = $adviceRepository->findByMonth($currentMonthName);
+        $advice = $adviceRepository->findWithPaginationByMonth($requestPage, $requestLimit, $currentMonthName);
 
         $jsonadviceList = $serializer->serialize($advice, 'json', [
             'groups' => ['getAdvice'], // Specify the serialization group
