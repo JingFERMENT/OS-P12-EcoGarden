@@ -12,6 +12,7 @@ use Symfony\Component\HttpKernel\Exception\HttpException;
 use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
 use Symfony\Component\Routing\Attribute\Route;
 use Symfony\Component\Routing\Generator\UrlGeneratorInterface;
+use Symfony\Component\Security\Http\Attribute\IsGranted;
 use Symfony\Component\Serializer\SerializerInterface;
 use Symfony\Component\Validator\Validator\ValidatorInterface;
 
@@ -102,6 +103,7 @@ final class UserController extends AbstractController
     }
 
     #[Route('/user/{id}', name: 'supprimerUnUser', methods: ['DELETE'])]
+    #[IsGranted('ROLE_ADMIN', message: 'Vous n\'avez pas les droits nécessaires pour supprimer un utilisateur.')]
     public function deleteUser(
         User $user,
         EntityManagerInterface $entityManager
@@ -118,6 +120,7 @@ final class UserController extends AbstractController
     }
 
     #[Route('/user/{id}', name: 'mettreAJourUnUser', methods: ['PUT'])]
+    #[IsGranted('ROLE_ADMIN', message: 'Vous n\'avez pas les droits nécessaires pour mettre à jour un utilisateur.')]
     public function updateUser(
         Request $request,
         SerializerInterface $serializer,

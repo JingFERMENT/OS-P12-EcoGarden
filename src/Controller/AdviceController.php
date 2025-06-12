@@ -18,6 +18,7 @@ use Symfony\Component\HttpKernel\Exception\HttpException;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 use Symfony\Component\Routing\Attribute\Route;
 use Symfony\Component\Routing\Generator\UrlGeneratorInterface;
+use Symfony\Component\Security\Http\Attribute\IsGranted;
 use Symfony\Component\Serializer\Normalizer\AbstractNormalizer;
 use Symfony\Component\Serializer\SerializerInterface;
 use Symfony\Component\Validator\Validator\ValidatorInterface;
@@ -101,17 +102,26 @@ final class AdviceController extends AbstractController
         );
     }
 
-    #[Route('/conseil/{id}', name: 'supprimerUnConseil', methods: ['DELETE'])]
-    public function deleteAdvice(Advice $advice, 
-    EntityManagerInterface $entityManager): JsonResponse
-    {
+    #[Route('/conseil/{id}', name: 'supprimerUnConseil', methods: ['DELETE'], requirements: ['id' => '\d+'])]
+    #[IsGranted('ROLE_ADMIN', message: 'Vous n\'avez pas les droits nécessaires pour supprimer un conseil.')]
+    public function deleteAdvice(
+        int $id,
+        AdviceRepository $adviceRepository,
+        EntityManagerInterface $entityManager
+    ): JsonResponse {
+        $advice = $adviceRepository->find($id);
+
+        if (!$advice) {
+            throw new HttpException(JsonResponse::HTTP_BAD_REQUEST, "Conseil avec l'ID $id non trouvé.");
+        }
         $entityManager->remove($advice);
         $entityManager->flush();
-        
+
         return new JsonResponse(['message' => 'Conseil supprimé avec succès.'], Response::HTTP_NO_CONTENT);
     }
 
     #[Route('/conseil', name: 'ajouterUnConseil', methods: ['POST'])]
+    #[IsGranted('ROLE_ADMIN', message: 'Vous n\'avez pas les droits nécessaires pour ajouter un conseil.')]
     public function createAdvice(
         Request $request,
         SerializerInterface $serializer,
@@ -181,15 +191,25 @@ final class AdviceController extends AbstractController
     }
 
     #[Route('/conseil/{id}', name: 'mettreAJourUnConseil', methods: ['PUT'])]
+    #[IsGranted('ROLE_ADMIN', message: 'Vous n\'avez pas les droits nécessaires pour mettre à jour un conseil.')]
     public function updateAdvice(
+        int $id,
+        AdviceRepository $adviceRepository,
         Request $request,
         SerializerInterface $serializer,
-        Advice $currentAdvice,
         EntityManagerInterface $entityManager,
         UserRepository $userRepository,
         MonthRepository $monthRepository,
         ValidatorInterface $validator
     ): JsonResponse {
+
+        // Manually fetch Advice entity
+        $currentAdvice = $adviceRepository->find($id);
+
+        if (!$currentAdvice) {
+            // Throw 400 Bad Request instead of 404
+            throw new HttpException(JsonResponse::HTTP_BAD_REQUEST, 'Conseil introuvable pour cet ID.');
+        }
 
         $content = $request->toArray();
 
@@ -200,13 +220,13 @@ final class AdviceController extends AbstractController
         if (!isset($content['month_ids']) || empty($content['month_ids'])) {
             throw new HttpException(JsonResponse::HTTP_BAD_REQUEST, 'Le mois du conseil est requis.');
         }
-        
+
         $userId = $content['user_id'];
-        
+
         if (!$userRepository->find($userId)) {
-            throw new NotFoundHttpException('Utilisateur non trouvé.');
+            throw new HttpException(JsonResponse::HTTP_BAD_REQUEST, 'Utilisateur non trouvé.');
         }
-        
+
         $updatedAdvice = $serializer->deserialize(
             $request->getContent(),
             Advice::class,
@@ -220,15 +240,15 @@ final class AdviceController extends AbstractController
 
         foreach ($monthIdArrays as $monthId) {
             if (!$monthRepository->find($monthId)) {
-                throw new NotFoundHttpException('Mois non trouvé.');
+                throw new HttpException(JsonResponse::HTTP_BAD_REQUEST, 'Mois non trouvé.');
             }
             $month = $monthRepository->find($monthId);
             $updatedAdvice->addMonth($month);
         }
 
         // Now validate, since user and months are set
-        $errors = $validator->validate($updatedAdvice); 
-        
+        $errors = $validator->validate($updatedAdvice);
+
         if (count($errors) > 0) {
             $messages = [];
             foreach ($errors as $error) {
