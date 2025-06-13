@@ -10,6 +10,7 @@ use App\Repository\UserRepository;
 use App\Service\MonthService;
 use Doctrine\ORM\EntityManagerInterface;
 use InvalidArgumentException;
+use phpDocumentor\Reflection\DocBlock\Tag;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
@@ -22,6 +23,8 @@ use Symfony\Component\Security\Http\Attribute\IsGranted;
 use Symfony\Component\Serializer\Normalizer\AbstractNormalizer;
 use Symfony\Component\Serializer\SerializerInterface;
 use Symfony\Component\Validator\Validator\ValidatorInterface;
+use Symfony\Contracts\Cache\ItemInterface;
+use Symfony\Contracts\Cache\TagAwareCacheInterface;
 
 final class AdviceController extends AbstractController
 {
@@ -38,13 +41,14 @@ final class AdviceController extends AbstractController
         AdviceRepository $adviceRepository,
         SerializerInterface $serializer,
         MonthService $monthService,
-        Request $request
+        Request $request,
+        TagAwareCacheInterface $cachePool
     ): JsonResponse {
 
         $requestPage = $request->get('page', 1);
 
         if (!is_numeric($requestPage) || $requestPage < 1) {
-             throw new HttpException(JsonResponse::HTTP_BAD_REQUEST, 'Le paramètre page doit être un nombre entier positif.');
+            throw new HttpException(JsonResponse::HTTP_BAD_REQUEST, 'Le paramètre page doit être un nombre entier positif.');
         }
 
         $requestLimit = $request->get('limit', 10);
@@ -55,11 +59,41 @@ final class AdviceController extends AbstractController
 
         $currentMonthName = $monthService->getCurrentMonthName() ?? null;
 
-        $advice = $adviceRepository->findWithPaginationByMonth($requestPage, $requestLimit, $currentMonthName);
+        if ($currentMonthName === null) {
+            throw new HttpException(JsonResponse::HTTP_BAD_REQUEST, 'Le mois actuel n\'est pas valide.');
+        }
 
-        $jsonadviceList = $serializer->serialize($advice, 'json', [
-            'groups' => ['getAdvice'], // Specify the serialization group
-        ]);
+        // create a cache key 
+        $idCache = 'GetAllAdviceOfCurrentMonth-' . $requestPage . "-" . $requestLimit;
+
+        // Use the cache pool to get the cached advice or fetch it if not cached
+        $jsonadviceList = $cachePool->get(
+            $idCache,
+            // ItemInterface : interface que Symfony utilise pour manipuler une entrée dans le cache.
+            function (ItemInterface $item) use (
+                $adviceRepository,
+                $requestPage,
+                $requestLimit,
+                $monthService,
+                $serializer
+            ) {
+                // echo("ELEMENT PAS EN CACHE, ON LE RECUPERE DEPUIS LA BASE DE DONNEES");
+                $item->expiresAfter(3600); // Cache for 1 hour
+                $item->tag('adviceOfCurrentMonth'); // Tag the cache item for invalidation
+
+                $cachedAdvice = $adviceRepository->findWithPaginationByMonth($requestPage, $requestLimit, $monthService->getCurrentMonthName());
+
+                if (empty($cachedAdvice)) {
+                    throw new HttpException(JsonResponse::HTTP_BAD_REQUEST, 'Aucun conseil trouvé pour le mois de ' . $monthService->getCurrentMonthName() . '.');
+                }
+
+                //lazy-load the advice data
+                return $serializer->serialize($cachedAdvice, 'json', [
+                    'groups' => ['getAdvice'], // Specify the serialization group
+                ]);
+            }
+        );
+
 
         return new JsonResponse(
             $jsonadviceList, // The serialized data
@@ -128,13 +162,18 @@ final class AdviceController extends AbstractController
     public function deleteAdvice(
         int $id,
         AdviceRepository $adviceRepository,
-        EntityManagerInterface $entityManager
+        EntityManagerInterface $entityManager,
+        TagAwareCacheInterface $cachePool
     ): JsonResponse {
+        // invalidate the cache for the current month's advice
+        $cachePool->invalidateTags(["adviceOfCurrentMonth"]);
+        
         $advice = $adviceRepository->find($id);
 
         if (!$advice) {
             throw new HttpException(JsonResponse::HTTP_BAD_REQUEST, "Conseil avec l'ID $id non trouvé.");
         }
+
         $entityManager->remove($advice);
         $entityManager->flush();
 
