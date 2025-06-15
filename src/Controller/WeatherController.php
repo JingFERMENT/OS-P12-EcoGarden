@@ -12,14 +12,15 @@ use Symfony\Component\Routing\Attribute\Route;
 final class WeatherController extends AbstractController
 {
     /**
-     * Get the weather for a given city or the user's city if none is provided.
+     * Cette méthode permet de retourner la météo d’une ville donnée ou dans le cas où la ville n’est pas renseignée, c’est la ville du
+    *  compte utilisateur qui est utilisée.
      * @param string|null $ville
      * @param Security $security
      * @param WeatherService $weatherFullService
      * @return JsonResponse
      */
 
-    #[Route('/meteo/{ville?}', name: 'meteo', methods: ['GET'])] // {ville?} makes the parameter optional
+    #[Route('/api/meteo/{ville?}', name: 'meteo', methods: ['GET'])] // {ville?} makes the parameter optional
     public function getWeather(
         ?string $ville,
         Security $security,

@@ -10,10 +10,10 @@ security:
             pattern: ^/(_(profiler|wdt)|css|images|js)/
             security: false # dev firewall does not require authentication
         login: #Handles JSON login when the client submits their email/password to get a JWT token.
-            pattern: ^/auth
+            pattern: ^/api/auth
             stateless: true
             json_login: #Enables JSON-based authentication.
-                check_path: /auth # Symfony listens on this route for POST requests with credentials.
+                check_path: /api/auth # Symfony listens on this route for POST requests with credentials.
                 success_handler: lexik_jwt_authentication.handler.authentication_success # Handles successful authentication and returns a JWT token.
                 failure_handler: lexik_jwt_authentication.handler.authentication_failure # Handles failed authentication attempts.
         api:
@@ -34,16 +34,17 @@ security:
     # Note: Only the *first* access control that matches will be used
     access_control:
     # Public access for registration and login
-        - { path: ^/user, methods: [POST], roles: PUBLIC_ACCESS } # Create an account
-        - { path: ^/auth, roles: PUBLIC_ACCESS } # Log in and get a JWT token
+        - { path: ^/api/user, methods: [POST], roles: PUBLIC_ACCESS } # Create an account
+        - { path: ^/api/doc, roles: PUBLIC_ACCESS } # API Doc
+        - { path: ^/api/auth, roles: PUBLIC_ACCESS } # Log in and get a JWT token
         
     # 🔐 Authenticated user access
     # Get all advice of the current month or specific month
-        - { path: ^/conseil, methods: [GET], roles: IS_AUTHENTICATED_FULLY } 
+        - { path: ^/api/conseil, methods: [GET], roles: IS_AUTHENTICATED_FULLY } 
     # Get weather (user's city or given city)
-        - { path: ^/meteo, methods: [GET], roles: IS_AUTHENTICATED_FULLY }
+        - { path: ^/api/meteo, methods: [GET], roles: IS_AUTHENTICATED_FULLY }
         
     # 🔐 Admin access
-        - { path: ^/conseil$, methods: [POST], roles: ROLE_ADMIN } # Add a new advice
-        - { path: ^/conseil/\d+$, methods: [PUT, DELETE], roles: ROLE_ADMIN } # Update or delete an advice
-        - { path: ^/user/\d+$, methods: [PUT, DELETE], roles: ROLE_ADMIN } # Update or delete a user
+        - { path: ^/api/conseil$, methods: [POST], roles: ROLE_ADMIN } # Add a new advice
+        - { path: ^/api/conseil/\d+$, methods: [GET, PUT, DELETE], roles: ROLE_ADMIN } 
+        - { path: ^/api/user/\d+$, methods: [PUT, DELETE], roles: ROLE_ADMIN } # Update or delete a user

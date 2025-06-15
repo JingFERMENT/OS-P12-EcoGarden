@@ -22,17 +22,37 @@ use JMS\Serializer\SerializerInterface;
 use Symfony\Component\Validator\Validator\ValidatorInterface;
 use Symfony\Contracts\Cache\ItemInterface;
 use Symfony\Contracts\Cache\TagAwareCacheInterface;
+use Nelmio\ApiDocBundle\Attribute\Model as AttributeModel;
+use OpenApi\Attributes as OA;
+
 
 final class AdviceController extends AbstractController
 {
-    #[Route('/conseil/', name: 'conseilsDuMoisEnCours', methods: ['GET'])]
+
+    #[Route('/api/conseil/', name: 'conseilsDuMoisEnCours', methods: ['GET'])]
+    #[OA\Response(
+        response: 200,
+        description: 'Retourne la liste des conseils',
+        content: new OA\JsonContent(
+            type: 'array',
+            items: new OA\Items(ref: new AttributeModel(type: Advice::class, groups: ['getAdvice']))
+        )
+    )]
+    #[OA\Parameter(
+        name: 'page',
+        in: 'query',
+        description: 'Page à récupérer',
+        schema: new OA\Schema(type: 'integer')
+    )]
+    #[OA\Parameter(
+        name: 'limit',
+        in: 'query',
+        description: 'Nombre d\'éléments à récupérer',
+        schema: new OA\Schema(type: 'integer')
+    )]
+    #[OA\Tag(name: 'Advice')]
     /**
-     * Retrieves all advice for the current month.
-     *
-     * @param AdviceRepository $adviceRepository
-     * @param SerializerInterface $serializer
-     * @param MonthService $monthService
-     * @return JsonResponse
+     * Cette méthode permet de récupérer la liste des conseils du mois en cours
      */
     public function getAllAdvice(
         AdviceRepository $adviceRepository,
@@ -48,7 +68,7 @@ final class AdviceController extends AbstractController
             throw new HttpException(JsonResponse::HTTP_BAD_REQUEST, 'Le paramètre page doit être un nombre entier positif.');
         }
 
-        $requestLimit = $request->get('limit', 10);
+        $requestLimit = $request->get('limit', 6);
 
         if (!is_numeric($requestLimit) || $requestLimit < 1) {
             throw new HttpException(JsonResponse::HTTP_BAD_REQUEST, 'Le paramètre limit doit être un nombre entier positif.');
@@ -88,9 +108,10 @@ final class AdviceController extends AbstractController
                     ->setGroups(['getAdvice']); // Specify the serialization group
 
                 //lazy-load the advice data
-                return $serializer->serialize($cachedAdvice, 
-                'json', 
-                $context, // Specify the serialization group
+                return $serializer->serialize(
+                    $cachedAdvice,
+                    'json',
+                    $context, // Specify the serialization group
                 );
             }
         );
@@ -104,7 +125,32 @@ final class AdviceController extends AbstractController
         );
     }
 
-    #[Route('/conseil/{mois}', name: 'conseilsParMois', methods: ['GET'])]
+    /**
+     * Cette méthode permet de récupérer la liste des conseils du mois spécifié. 
+     * Le mois est au format numérique (1=janvier, 2=février, etc…)
+     */
+    #[Route('/api/conseil/{mois}', name: 'conseilsParMois', methods: ['GET'])]
+        #[OA\Response(
+        response: 200,
+        description: 'Retourne la liste des conseils',
+        content: new OA\JsonContent(
+            type: 'array',
+            items: new OA\Items(ref: new AttributeModel(type: Advice::class, groups: ['getAdvice']))
+        )
+    )]
+    #[OA\Parameter(
+        name: 'page',
+        in: 'query',
+        description: 'Page à récupérer',
+        schema: new OA\Schema(type: 'integer')
+    )]
+    #[OA\Parameter(
+        name: 'limit',
+        in: 'query',
+        description: 'Nombre d\'éléments à récupérer',
+        schema: new OA\Schema(type: 'integer')
+    )]
+    #[OA\Tag(name: 'Advice')]
     public function getAdviceByMonth(
         string $mois,
         AdviceRepository $adviceRepository,
@@ -126,14 +172,14 @@ final class AdviceController extends AbstractController
         }
 
         $monthName = $monthService->getMonthName($mois);
-        
+
 
         if ($monthName === null) {
             throw new HttpException(JsonResponse::HTTP_BAD_REQUEST, "Le mois '$mois' n'est pas valide.");
         }
 
         $monthName = $monthService->getMonthName($mois);
-        
+
 
         $advice = $adviceRepository->findWithPaginationByMonth($requestPage, $requestLimit, $monthName);
 
@@ -154,7 +200,12 @@ final class AdviceController extends AbstractController
         );
     }
 
-    #[Route('/conseil/{id}', name: 'supprimerUnConseil', methods: ['DELETE'], requirements: ['id' => '\d+'])]
+
+    /**
+     * Cette méthode permet la suppression d’un conseil.
+     *                                                          
+     */
+    #[Route('/api/conseil/{id}', name: 'supprimerUnConseil', methods: ['DELETE'], requirements: ['id' => '\d+'])]
     #[IsGranted('ROLE_ADMIN', message: 'Vous n\'avez pas les droits nécessaires pour supprimer un conseil.')]
     public function deleteAdvice(
         int $id,
@@ -164,7 +215,7 @@ final class AdviceController extends AbstractController
     ): JsonResponse {
         // invalidate the cache for the current month's advice
         $cachePool->invalidateTags(["adviceOfCurrentMonth"]);
-        
+
         $advice = $adviceRepository->find($id);
 
         if (!$advice) {
@@ -177,7 +228,11 @@ final class AdviceController extends AbstractController
         return new JsonResponse(['message' => 'Conseil supprimé avec succès.'], Response::HTTP_NO_CONTENT);
     }
 
-     #[Route('/conseil/view/{id}', name: 'conseilParId', methods: ['GET'])]
+    /**
+     * Cette méthode permet de récupérer un conseil à partir de son id.
+     *                                                          
+     */
+    #[Route('/api/conseil/view/{id}', name: 'conseilParId', methods: ['GET'])]
     public function getAdviceById(int $id, AdviceRepository $adviceRepository, SerializerInterface $serializer): JsonResponse
     {
         $advice = $adviceRepository->find($id);
@@ -199,7 +254,11 @@ final class AdviceController extends AbstractController
         );
     }
 
-    #[Route('/conseil', name: 'ajouterUnConseil', methods: ['POST'])]
+    /**
+     * Cette méthode permet d'ajouter un conseil.
+     *                                                          
+     */
+    #[Route('/api/conseil', name: 'ajouterUnConseil', methods: ['POST'])]
     #[IsGranted('ROLE_ADMIN', message: 'Vous n\'avez pas les droits nécessaires pour ajouter un conseil.')]
     public function createAdvice(
         Request $request,
@@ -228,15 +287,15 @@ final class AdviceController extends AbstractController
 
         // Deserialize the JSON request content into an Advice entity
         $advice = $serializer->deserialize($request->getContent(), Advice::class, 'json');
-        
+
         $newAdvice = new Advice();
         $newAdvice->setDescription($advice->getDescription());
         // Set the user from the repository
 
         $newAdvice->setUser($user);
-    
+
         $monthIdArrays = $content['month_ids'];
-        
+
         foreach ($monthIdArrays as $monthId) {
             if (!$monthRepository->find($monthId)) {
                 throw new NotFoundHttpException('Mois non trouvé.');
@@ -262,7 +321,7 @@ final class AdviceController extends AbstractController
         $context = SerializationContext::create()
             ->setGroups(['getAdvice']); // Specify the serialization group
 
-        $jsonadviceList = $serializer->serialize($newAdvice, 'json', $context); 
+        $jsonadviceList = $serializer->serialize($newAdvice, 'json', $context);
 
         $location = $urlGenerator->generate('conseilParId', ['id' => $newAdvice->getId()], UrlGeneratorInterface::ABSOLUTE_URL);
 
@@ -274,7 +333,11 @@ final class AdviceController extends AbstractController
         );
     }
 
-    #[Route('/conseil/{id}', name: 'mettreAJourUnConseil', methods: ['PUT'])]
+    /**
+     * Cette méthode permet de mettre à jour un conseil qui correspond à l’id.
+     *                                                          
+     */
+    #[Route('/api/conseil/{id}', name: 'mettreAJourUnConseil', methods: ['PUT'])]
     #[IsGranted('ROLE_ADMIN', message: 'Vous n\'avez pas les droits nécessaires pour mettre à jour un conseil.')]
     public function updateAdvice(
         int $id,
@@ -302,7 +365,7 @@ final class AdviceController extends AbstractController
             throw new HttpException(JsonResponse::HTTP_BAD_REQUEST, 'Le mois du conseil est requis.');
         }
 
-        if(!isset($content['description']) || empty($content['description'])) {
+        if (!isset($content['description']) || empty($content['description'])) {
             $currentAdvice->getDescription();
         } else {
             $currentAdvice->setDescription($content['description']);

@@ -20,7 +20,10 @@ use Symfony\Component\Validator\Validator\ValidatorInterface;
 
 final class UserController extends AbstractController
 {
-    #[Route('/user', name: 'creerUser', methods: ['POST'])]
+    #[Route('/api/user', name: 'creerUser', methods: ['POST'])]
+    /**
+     * Cette route permet de créer un nouveau compte utilisateur.
+     */
     public function createUser(
         Request $request,
         SerializerInterface $serializer,
@@ -83,7 +86,10 @@ final class UserController extends AbstractController
         );
     }
 
-    #[Route('/user/{id}', name: 'utilisateurParId', methods: ['GET'])]
+    /**
+     * Cette route permet de récupéer un utilisateur par son id
+     */
+    #[Route('/api/user/{id}', name: 'utilisateurParId', methods: ['GET'])]
     public function getUserById(
         ?User $user,
         SerializerInterface $serializer
@@ -107,7 +113,10 @@ final class UserController extends AbstractController
         );
     }
 
-    #[Route('/user/{id}', name: 'supprimerUnUser', methods: ['DELETE'])]
+    /**
+     * Cette route permet de supprimer un compte.
+     */
+    #[Route('/api/user/{id}', name: 'supprimerUnUser', methods: ['DELETE'])]
     #[IsGranted('ROLE_ADMIN', message: 'Vous n\'avez pas les droits nécessaires pour supprimer un utilisateur.')]
     public function deleteUser(
         User $user,
@@ -124,7 +133,10 @@ final class UserController extends AbstractController
         );
     }
 
-    #[Route('/user/{id}', name: 'mettreAJourUnUser', methods: ['PUT'])]
+    /**
+     * Cette route permet de mettre à jour un compte
+     */
+    #[Route('/api/user/{id}', name: 'mettreAJourUnUser', methods: ['PUT'])]
     #[IsGranted('ROLE_ADMIN', message: 'Vous n\'avez pas les droits nécessaires pour mettre à jour un utilisateur.')]
     public function updateUser(
         int $id,

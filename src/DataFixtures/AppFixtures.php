@@ -18,7 +18,7 @@ class AppFixtures extends Fixture
             'roles' => ['ROLE_ADMIN']
         ])->create();
         UserFactory::createMany(10);
-        AdviceFactory::createMany(50);
+        AdviceFactory::createMany(10);
         $manager->flush();
     }
 }

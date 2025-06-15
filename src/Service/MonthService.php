@@ -5,15 +5,15 @@ namespace App\Service;
 class MonthService
 {
     private const MONTHS = [
-        '01' => 'janvier',
-        '02' => 'février',
-        '03' => 'mars',
-        '04' => 'avril',
-        '05' => 'mai',
-        '06' => 'juin',
-        '07' => 'juillet',
-        '08' => 'août',
-        '09' => 'septembre',
+        '1' => 'janvier',
+        '2' => 'février',
+        '3' => 'mars',
+        '4' => 'avril',
+        '5' => 'mai',
+        '6' => 'juin',
+        '7' => 'juillet',
+        '8' => 'août',
+        '9' => 'septembre',
         '10' => 'octobre',
         '11' => 'novembre',
         '12' => 'décembre',
@@ -26,7 +26,7 @@ class MonthService
 
     public function getCurrentMonthName(): string
     {
-        $currentMonth = (new \DateTime())->format('m');
+        $currentMonth = (new \DateTime())->format('n');
         return self::MONTHS[$currentMonth];
     }
 
