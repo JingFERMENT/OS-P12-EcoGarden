@@ -20,15 +20,15 @@ class AdviceRepository extends ServiceEntityRepository
      * Finds all Advice entities with pagination for a specific month.
      * @param int $page The page number to retrieve
      * @param int $limit The number of items per page
-     * @param string $month The name of the month to filter by
+     * @param string $months The name of the months to filter by
      * @return Advice[] Returns an array of Advice objects
      */
-    public function findWithPaginationByMonth(int $page, int $limit, string $month): array
+    public function findWithPaginationByMonth(int $page, int $limit, string $months): array
     {
         return $this->createQueryBuilder('a')
-        ->join('a.month', 'm')
+        ->join('a.months', 'm')
             ->andWhere('m.name = :monthName')
-            ->setParameter('monthName', $month)
+            ->setParameter('monthName', $months)
             ->setFirstResult(($page - 1) * $limit) //à partir de quand nous allons récupérer les livres ; 
             ->setMaxResults($limit) //nombre de livres à récupérer
             ->getQuery()

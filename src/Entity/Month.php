@@ -6,7 +6,7 @@ use App\Repository\MonthRepository;
 use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\Common\Collections\Collection;
 use Doctrine\ORM\Mapping as ORM;
-use Symfony\Component\Validator\Constraints as Assert;
+use JMS\Serializer\Annotation\Groups;
 
 #[ORM\Entity(repositoryClass: MonthRepository::class)]
 class Month
@@ -22,12 +22,12 @@ class Month
     /**
      * @var Collection<int, Advice>
      */
-    #[ORM\ManyToMany(targetEntity: Advice::class, mappedBy: 'month')]
-    private Collection $advice;
+    #[ORM\ManyToMany(targetEntity: Advice::class, mappedBy: 'months')]
+    private Collection $advices;
 
     public function __construct()
     {
-        $this->advice = new ArrayCollection();
+        $this->advices = new ArrayCollection();
     }
 
     public function getId(): ?int
@@ -52,13 +52,13 @@ class Month
      */
     public function getAdvice(): Collection
     {
-        return $this->advice;
+        return $this->advices;
     }
 
     public function addAdvice(Advice $advice): static
     {
-        if (!$this->advice->contains($advice)) {
-            $this->advice->add($advice);
+        if (!$this->advices->contains($advice)) {
+            $this->advices->add($advice);
             $advice->addMonth($this);
         }
 
@@ -67,7 +67,7 @@ class Month
 
     public function removeAdvice(Advice $advice): static
     {
-        if ($this->advice->removeElement($advice)) {
+        if ($this->advices->removeElement($advice)) {
             $advice->removeMonth($this);
         }
 

@@ -26,23 +26,35 @@ final class WeatherController extends AbstractController
         WeatherService $weatherFullService
     ): JsonResponse {
 
-        $formattedVille = ucfirst(strtolower($ville)); 
-        
+        $formattedVille = ucfirst(strtolower($ville));
+
         if (!$formattedVille) {
             $user = $security->getUser();
             $ville = $user?->getCity(); // Default to Paris if no city is provided
-           
+
         }
 
-        $weather = $weatherFullService->getWeatherByCity($formattedVille)['main']['temp'];
-        $weather = round($weather); // Convert Kelvin to Celsius
-        $temperature = $weather . '°C';
+        try {
+            $weatherData = $weatherFullService->getWeatherByCity($formattedVille);
 
-        return new JsonResponse([
-            "La température de $formattedVille est de $temperature.",
-            Response::HTTP_OK,
-            [],
-            true
-        ]);
+            if(!isset($weatherData['main']['temp'])) {
+                return new JsonResponse([
+                    "error" => "La ville $formattedVille n'a pas été trouvée.",
+                ], Response::HTTP_NOT_FOUND);
+            }
+            
+            $temperature = round($weatherData['main']['temp']). '°C'; // Convert Kelvin to Celsius
+
+            return new JsonResponse([
+                "La température de $formattedVille est de $temperature.",
+                Response::HTTP_OK,
+                [],
+                true
+            ]);
+        } catch (\Throwable $e) {
+            return new JsonResponse([
+                "error" => "Une erreur s'est produite lors de la récupération de météo.",
+            ], Response::HTTP_INTERNAL_SERVER_ERROR);
+        }
     }
 }

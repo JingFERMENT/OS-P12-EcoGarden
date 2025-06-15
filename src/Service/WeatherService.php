@@ -3,9 +3,6 @@
 namespace App\Service;
 
 use Symfony\Component\DependencyInjection\Attribute\Autowire;
-use Symfony\Component\HttpFoundation\JsonResponse;
-use Symfony\Component\HttpFoundation\Response;
-use Symfony\Component\Serializer\SerializerInterface;
 use Symfony\Contracts\Cache\ItemInterface;
 use Symfony\Contracts\Cache\TagAwareCacheInterface;
 use Symfony\Contracts\HttpClient\HttpClientInterface;
@@ -36,11 +33,15 @@ class WeatherService
 
         // check if the data is already cached
         $weatherFullService = $this->cachePool->get(
-            $idCache,
-            function (ItemInterface $item) use ($city) {
+            $idCache, // use the cache pool to get the data
 
-                $item->expiresAfter(3600);
-                $item->tag('weather_data');
+            // if the data is not cached, call the OpenWeatherMap API
+
+            // ItemInterface : interface que Symfony utilise pour manipuler une entrée dans le cache.
+            function (ItemInterface $item) use ($city) {
+                $item->expiresAfter(3600); // cache the data for 1 hour
+
+                $item->tag('weather_data'); // tag the cache item for invalidation later
 
                 // 1. get the latitude and longitude from the city name in OpenWeatherMap API 
                 $geoResponse = $this->httpClient->request(
@@ -56,12 +57,10 @@ class WeatherService
                 );
 
                 $geoData = $geoResponse->toArray();
-
                 $latitude = $geoData['coord']['lat'];
                 $longitude = $geoData['coord']['lon'];
 
                 // 2. get the weather data from OpenWeatherMap API using the latitude and longitude
-
                 $fullResponse = $this->httpClient->request(
                     'GET',
                     'https://api.openweathermap.org/data/2.5/weather',
@@ -79,11 +78,10 @@ class WeatherService
 
                 $fullData = $fullResponse->toArray();
                 return $fullData;
-
             }
         );
 
+        // return the weather data
         return $weatherFullService;
-        
     }
 }

@@ -10,7 +10,7 @@ use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\Common\Collections\Collection;
 use Symfony\Component\Validator\Constraints as Assert;
 use Symfony\Bridge\Doctrine\Validator\Constraints\UniqueEntity;
-use Symfony\Component\Serializer\Annotation\Groups;
+use JMS\Serializer\Annotation\Groups;
 
 #[ORM\Entity(repositoryClass: UserRepository::class)]
 #[ORM\UniqueConstraint(name: 'UNIQ_IDENTIFIER_EMAIL', fields: ['email'])]
@@ -84,7 +84,7 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     /**
      * @var string|null Mot de passe en clair (non persisté, utilisé uniquement lors de la création ou mise à jour)
      */
-    #[Assert\NotBlank(message: 'Le mot de passe ne peut pas être vide.')]
+     #[Assert\NotBlank(message: 'Le mot de passe ne peut pas être vide.', groups: ['create'])]
     #[Assert\Length(
         min: 8,
         minMessage: 'Le mot de passe doit contenir au moins {{ limit }} caractères.'

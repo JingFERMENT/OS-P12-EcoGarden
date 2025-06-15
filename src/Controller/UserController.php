@@ -3,6 +3,7 @@
 namespace App\Controller;
 
 use App\Entity\User;
+use App\Repository\UserRepository;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -13,7 +14,8 @@ use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
 use Symfony\Component\Routing\Attribute\Route;
 use Symfony\Component\Routing\Generator\UrlGeneratorInterface;
 use Symfony\Component\Security\Http\Attribute\IsGranted;
-use Symfony\Component\Serializer\SerializerInterface;
+use JMS\Serializer\SerializerInterface;
+use JMS\Serializer\SerializationContext;
 use Symfony\Component\Validator\Validator\ValidatorInterface;
 
 final class UserController extends AbstractController
@@ -62,9 +64,10 @@ final class UserController extends AbstractController
         $entityManager->persist($user);
         $entityManager->flush();
 
-        $jsonuserList = $serializer->serialize($user, 'json', [
-            'groups' => ['getUser'], // Specify the serialization group
-        ]);
+        $context = SerializationContext::create()
+            ->setGroups(['getUser']);
+
+        $jsonuserList = $serializer->serialize($user, 'json', $context);
 
         $location = $this->generateUrl(
             'utilisateurParId',
@@ -90,9 +93,11 @@ final class UserController extends AbstractController
         }
 
         // Serialize the user entity to JSON
-        $jsonUser = $serializer->serialize($user, 'json', [
-            'groups' => ['getUser'], // Specify the serialization group
-        ]);
+        $context = SerializationContext::create()
+            ->setGroups(['getUser']); // Specify the serialization group
+
+
+        $jsonUser = $serializer->serialize($user, 'json', $context);
 
         return new JsonResponse(
             $jsonUser, // The serialized data
@@ -122,19 +127,47 @@ final class UserController extends AbstractController
     #[Route('/user/{id}', name: 'mettreAJourUnUser', methods: ['PUT'])]
     #[IsGranted('ROLE_ADMIN', message: 'Vous n\'avez pas les droits nécessaires pour mettre à jour un utilisateur.')]
     public function updateUser(
+        int $id,
+        UserRepository $userRepository,
         Request $request,
-        SerializerInterface $serializer,
-        User $currentUser,
         EntityManagerInterface $entityManager,
         UserPasswordHasherInterface $passwordHasher,
         ValidatorInterface $validator
     ): JsonResponse {
-        // Deserialize the JSON request content into a User entity
-        $user = $serializer->deserialize($request->getContent(), User::class, 'json', [
-            'object_to_populate' => $currentUser, // Populate the existing user entity
-        ]);
 
-        $errors = $validator->validate($user);
+        // Find the user by ID
+        $currentUser = $userRepository->find($id);
+
+        if (!$currentUser) {
+            throw new HttpException(JsonResponse::HTTP_NOT_FOUND, 'Utilisateur non trouvé.');
+        }
+
+        $content = $request->toArray();
+
+        // Update fields dynamically
+        $fieldsMap = [
+            'firstName' => 'setFirstName',
+            'lastName' => 'setLastName',
+            'email' => 'setEmail',
+            'city' => 'setCity',
+        ];
+
+        foreach ($fieldsMap as $field => $setter) {
+            if (!empty($content[$field])) {
+                $currentUser->$setter($content[$field]);
+            }
+        }
+
+        // Handle password separately
+        if (!empty($content['password'])) {
+            $currentUser->setPlainPassword($content['password']);
+            $hashedPassword = $passwordHasher->hashPassword($currentUser, $content['password']);
+            $currentUser->setPassword($hashedPassword);
+        } 
+
+        $currentUser->getPlainPassword();
+        
+        $errors = $validator->validate($currentUser);
 
         if (count($errors) > 0) {
             $errorMessages = [];
@@ -144,12 +177,8 @@ final class UserController extends AbstractController
             throw new HttpException(JsonResponse::HTTP_BAD_REQUEST, implode(', ', $errorMessages));
         }
 
-        $hashedPassword = $passwordHasher->hashPassword($user, $user->getPlainPassword());
-        $user->setPassword($hashedPassword);
-
-
         // Persist the updated user entity
-        $entityManager->persist($user);
+        $entityManager->persist($currentUser);
         $entityManager->flush();
 
         return new JsonResponse(

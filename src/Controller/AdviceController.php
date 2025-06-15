@@ -3,14 +3,12 @@
 namespace App\Controller;
 
 use App\Entity\Advice;
-use App\Entity\Month;
 use App\Repository\AdviceRepository;
 use App\Repository\MonthRepository;
 use App\Repository\UserRepository;
 use App\Service\MonthService;
 use Doctrine\ORM\EntityManagerInterface;
-use InvalidArgumentException;
-use phpDocumentor\Reflection\DocBlock\Tag;
+use JMS\Serializer\SerializationContext;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
@@ -20,8 +18,7 @@ use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 use Symfony\Component\Routing\Attribute\Route;
 use Symfony\Component\Routing\Generator\UrlGeneratorInterface;
 use Symfony\Component\Security\Http\Attribute\IsGranted;
-use Symfony\Component\Serializer\Normalizer\AbstractNormalizer;
-use Symfony\Component\Serializer\SerializerInterface;
+use JMS\Serializer\SerializerInterface;
 use Symfony\Component\Validator\Validator\ValidatorInterface;
 use Symfony\Contracts\Cache\ItemInterface;
 use Symfony\Contracts\Cache\TagAwareCacheInterface;
@@ -87,10 +84,14 @@ final class AdviceController extends AbstractController
                     throw new HttpException(JsonResponse::HTTP_BAD_REQUEST, 'Aucun conseil trouvé pour le mois de ' . $monthService->getCurrentMonthName() . '.');
                 }
 
+                $context = SerializationContext::create()
+                    ->setGroups(['getAdvice']); // Specify the serialization group
+
                 //lazy-load the advice data
-                return $serializer->serialize($cachedAdvice, 'json', [
-                    'groups' => ['getAdvice'], // Specify the serialization group
-                ]);
+                return $serializer->serialize($cachedAdvice, 
+                'json', 
+                $context, // Specify the serialization group
+                );
             }
         );
 
@@ -108,49 +109,45 @@ final class AdviceController extends AbstractController
         string $mois,
         AdviceRepository $adviceRepository,
         SerializerInterface $serializer,
-        MonthService $monthService
+        MonthService $monthService,
+        Request $request
     ): JsonResponse {
 
+        $requestPage = $request->get('page', 1);
+
+        if (!is_numeric($requestPage) || $requestPage < 1) {
+            throw new HttpException(JsonResponse::HTTP_BAD_REQUEST, 'Le paramètre page doit être un nombre entier positif.');
+        }
+
+        $requestLimit = $request->get('limit', 10);
+
+        if (!is_numeric($requestLimit) || $requestLimit < 1) {
+            throw new HttpException(JsonResponse::HTTP_BAD_REQUEST, 'Le paramètre limit doit être un nombre entier positif.');
+        }
+
         $monthName = $monthService->getMonthName($mois);
+        
 
         if ($monthName === null) {
             throw new HttpException(JsonResponse::HTTP_BAD_REQUEST, "Le mois '$mois' n'est pas valide.");
         }
 
         $monthName = $monthService->getMonthName($mois);
-        $advice = $adviceRepository->findByMonth($monthName);
+        
+
+        $advice = $adviceRepository->findWithPaginationByMonth($requestPage, $requestLimit, $monthName);
 
         if (empty($advice)) {
             throw new NotFoundHttpException("Aucun conseil trouvé pour le mois de $monthName.");
         }
 
-        $jsonadviceList = $serializer->serialize($advice, 'json', [
-            'groups' => ['getAdvice'], // Specify the serialization group
-        ]);
+        $context = SerializationContext::create()
+            ->setGroups(['getAdvice']); // Specify the serialization group
+
+        $jsonadviceList = $serializer->serialize($advice, 'json', $context);
 
         return new JsonResponse(
             $jsonadviceList, // The serialized data
-            Response::HTTP_OK, // HTTP status code
-            [], // Headers can be added here if needed
-            true // This tells Symfony to not encode the data again
-        );
-    }
-
-    #[Route('/conseil/view/{id}', name: 'conseilParId', methods: ['GET'])]
-    public function getAdviceById(int $id, AdviceRepository $adviceRepository, SerializerInterface $serializer): JsonResponse
-    {
-        $advice = $adviceRepository->find($id);
-
-        if (!$advice) {
-            throw new NotFoundHttpException("Conseil avec l'ID $id non trouvé.");
-        }
-
-        $jsonadvice = $serializer->serialize($advice, 'json', [
-            'groups' => ['getAdvice'], // Specify the serialization group
-        ]);
-
-        return new JsonResponse(
-            $jsonadvice, // The serialized data
             Response::HTTP_OK, // HTTP status code
             [], // Headers can be added here if needed
             true // This tells Symfony to not encode the data again
@@ -180,6 +177,28 @@ final class AdviceController extends AbstractController
         return new JsonResponse(['message' => 'Conseil supprimé avec succès.'], Response::HTTP_NO_CONTENT);
     }
 
+     #[Route('/conseil/view/{id}', name: 'conseilParId', methods: ['GET'])]
+    public function getAdviceById(int $id, AdviceRepository $adviceRepository, SerializerInterface $serializer): JsonResponse
+    {
+        $advice = $adviceRepository->find($id);
+
+        if (!$advice) {
+            throw new NotFoundHttpException("Conseil avec l'ID $id non trouvé.");
+        }
+
+        $context = SerializationContext::create()
+            ->setGroups(['getAdvice']); // Specify the serialization group
+
+        $jsonadvice = $serializer->serialize($advice, 'json', $context);
+
+        return new JsonResponse(
+            $jsonadvice, // The serialized data
+            Response::HTTP_OK, // HTTP status code
+            [], // Headers can be added here if needed
+            true // This tells Symfony to not encode the data again
+        );
+    }
+
     #[Route('/conseil', name: 'ajouterUnConseil', methods: ['POST'])]
     #[IsGranted('ROLE_ADMIN', message: 'Vous n\'avez pas les droits nécessaires pour ajouter un conseil.')]
     public function createAdvice(
@@ -201,7 +220,7 @@ final class AdviceController extends AbstractController
             throw new HttpException(JsonResponse::HTTP_BAD_REQUEST, 'Le mois du conseil est requis.');
         }
 
-        $user = $userRepository->find($content['user_id']);;
+        $user = $userRepository->find($content['user_id']);
 
         if (!$user) {
             throw new NotFoundHttpException('Utilisateur non trouvé.');
@@ -209,21 +228,25 @@ final class AdviceController extends AbstractController
 
         // Deserialize the JSON request content into an Advice entity
         $advice = $serializer->deserialize($request->getContent(), Advice::class, 'json');
+        
+        $newAdvice = new Advice();
+        $newAdvice->setDescription($advice->getDescription());
+        // Set the user from the repository
 
-        $advice->setUser($user);
-
+        $newAdvice->setUser($user);
+    
         $monthIdArrays = $content['month_ids'];
-
+        
         foreach ($monthIdArrays as $monthId) {
             if (!$monthRepository->find($monthId)) {
                 throw new NotFoundHttpException('Mois non trouvé.');
             }
             $month = $monthRepository->find($monthId);
-            $advice->addMonth($month);
+            $newAdvice->addMonth($month);
         }
 
         // Now validate, since user and months are set
-        $errors = $validator->validate($advice);
+        $errors = $validator->validate($newAdvice);
 
         if (count($errors) > 0) {
             $messages = [];
@@ -233,14 +256,15 @@ final class AdviceController extends AbstractController
             throw new HttpException(JsonResponse::HTTP_BAD_REQUEST, implode(', ', $messages));
         }
 
-        $entityManager->persist($advice);
+        $entityManager->persist($newAdvice);
         $entityManager->flush();
 
-        $jsonadviceList = $serializer->serialize($advice, 'json', [
-            'groups' => ['getAdvice'], // Specify the serialization group
-        ]);
+        $context = SerializationContext::create()
+            ->setGroups(['getAdvice']); // Specify the serialization group
 
-        $location = $urlGenerator->generate('conseilParId', ['id' => $advice->getId()], UrlGeneratorInterface::ABSOLUTE_URL);
+        $jsonadviceList = $serializer->serialize($newAdvice, 'json', $context); 
+
+        $location = $urlGenerator->generate('conseilParId', ['id' => $newAdvice->getId()], UrlGeneratorInterface::ABSOLUTE_URL);
 
         return new JsonResponse(
             $jsonadviceList, // The serialized data
@@ -256,19 +280,16 @@ final class AdviceController extends AbstractController
         int $id,
         AdviceRepository $adviceRepository,
         Request $request,
-        SerializerInterface $serializer,
         EntityManagerInterface $entityManager,
         UserRepository $userRepository,
         MonthRepository $monthRepository,
         ValidatorInterface $validator
     ): JsonResponse {
 
-        // Manually fetch Advice entity
         $currentAdvice = $adviceRepository->find($id);
 
         if (!$currentAdvice) {
-            // Throw 400 Bad Request instead of 404
-            throw new HttpException(JsonResponse::HTTP_BAD_REQUEST, 'Conseil introuvable pour cet ID.');
+            throw new HttpException(JsonResponse::HTTP_NOT_FOUND, 'Conseil introuvable pour cet ID.');
         }
 
         $content = $request->toArray();
@@ -281,20 +302,18 @@ final class AdviceController extends AbstractController
             throw new HttpException(JsonResponse::HTTP_BAD_REQUEST, 'Le mois du conseil est requis.');
         }
 
+        if(!isset($content['description']) || empty($content['description'])) {
+            $currentAdvice->getDescription();
+        } else {
+            $currentAdvice->setDescription($content['description']);
+        }
+
         $userId = $content['user_id'];
+        $currentAdvice->setUser($userRepository->find($userId));
 
         if (!$userRepository->find($userId)) {
             throw new HttpException(JsonResponse::HTTP_BAD_REQUEST, 'Utilisateur non trouvé.');
         }
-
-        $updatedAdvice = $serializer->deserialize(
-            $request->getContent(),
-            Advice::class,
-            'json',
-            [AbstractNormalizer::OBJECT_TO_POPULATE => $currentAdvice]
-        );
-
-        $updatedAdvice->setUser($userRepository->find($userId));
 
         $monthIdArrays = $content['month_ids'];
 
@@ -303,11 +322,11 @@ final class AdviceController extends AbstractController
                 throw new HttpException(JsonResponse::HTTP_BAD_REQUEST, 'Mois non trouvé.');
             }
             $month = $monthRepository->find($monthId);
-            $updatedAdvice->addMonth($month);
+            $currentAdvice->addMonth($month);
         }
 
         // Now validate, since user and months are set
-        $errors = $validator->validate($updatedAdvice);
+        $errors = $validator->validate($currentAdvice);
 
         if (count($errors) > 0) {
             $messages = [];
@@ -317,7 +336,7 @@ final class AdviceController extends AbstractController
             throw new HttpException(JsonResponse::HTTP_BAD_REQUEST, implode(', ', $messages));
         }
 
-        $entityManager->persist($updatedAdvice);
+        $entityManager->persist($currentAdvice);
         $entityManager->flush();
 
         return new JsonResponse(
