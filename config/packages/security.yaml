@@ -47,4 +47,4 @@ security:
     # 🔐 Admin access
         - { path: ^/api/conseil$, methods: [POST], roles: ROLE_ADMIN } # Add a new advice
         - { path: ^/api/conseil/\d+$, methods: [GET, PUT, DELETE], roles: ROLE_ADMIN } 
-        - { path: ^/api/user/\d+$, methods: [PUT, DELETE], roles: ROLE_ADMIN } # Update or delete a user
+        - { path: ^/api/user/\d+$, methods: [GET, PUT, DELETE], roles: ROLE_ADMIN } # Update or delete a user
